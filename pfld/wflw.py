@@ -197,11 +197,11 @@ class WLFWDate(object):
         # rvec - Output rotation vector that, together with tvec, brings points from the world coordinate system to the camera coordinate system.
         # tvec - Output translation vector. It is the position of the world origin (SELLION) in camera co-ords
         _, rvec, tvec = cv2.solvePnP(landmarks_3D, landmarks_2D, camera_matrix, camera_distortion)
-        rmat, _ = cv2.Rodrigues(rvec)
+        rmat, _  = cv2.Rodrigues(rvec)
         pose_mat = cv2.hconcat((rmat, tvec))
         _, _, _, _, _, _, euler_angles = cv2.decomposeProjectionMatrix(pose_mat)
         pitch, yaw, roll = map(lambda k: k[0], euler_angles)
-        return (pitch, yaw, roll )
+        return (pitch, yaw, roll)
 
 
     def _save_faces(self, faces, lmkpts, img_anno):
@@ -236,7 +236,7 @@ class WLFWDate(object):
     def _face_runner(self, img_anno):
 
         try:
-            img_path = os.path.join(self.args.data_dir, 'wlfw_images', img_anno[-1])
+            img_path = os.path.join(self.args.data_dir, 'wflw_images', img_anno[-1])
             img = cv2.imread(img_path)
         except Exception as e:
             print(e)

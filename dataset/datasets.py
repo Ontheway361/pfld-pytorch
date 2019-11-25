@@ -35,13 +35,14 @@ class WLFWDatasets(data.Dataset):
 
         if self.transforms:
             self.img = self.transforms(self.img)
-            
+
         return (self.img, self.landmark, self.attribute, self.euler_angle)
 
     def __len__(self):
         return len(self.lines)
 
 if __name__ == '__main__':
+    
     file_list = './data/test_data/list.txt'
     wlfwdataset = WLFWDatasets(file_list)
     dataloader = DataLoader(wlfwdataset, batch_size=256, shuffle=True, num_workers=0, drop_last=False)
