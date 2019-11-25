@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 #-*- coding:utf-8 -*-
-'''
-Created on 2019/11/25
-author: relu
-'''
 
 import os
 import sys
@@ -23,15 +19,15 @@ from IPython import embed
 
 class PFLDTrain(object):
 
-    def __init__(self, args = args):
+    def __init__(self, args):
 
         self.args   = args
         self.model  = dict()
         self.data   = dict()
         self.device = args.use_gpu and torch.cuda.is_available()
 
-    @staticmethod
-    def _report_settings():
+
+    def _report_settings(self):
         ''' Report the settings '''
 
         str = '-' * 16
@@ -51,10 +47,10 @@ class PFLDTrain(object):
         self.model['optimizer'] = torch.optim.Adam(
                                       [{'params': self.model['backbone'].parameters()},
                                        {'params': self.model['auxilnet'].parameters()}],
-                                      lr=args.base_lr,
-                                      weight_decay=args.weight_decay)
+                                      lr=self.args.base_lr,
+                                      weight_decay=self.args.weight_decay)
         self.model['scheduler'] = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                                      self.model['optimizer'], mode='min', patience=args.lr_patience, \
+                                      self.model['optimizer'], mode='min', patience=self.args.lr_patience, \
                                       verbose=True)
 
         if self.device and len(self.args.gpu_ids) > 1:
@@ -67,8 +63,8 @@ class PFLDTrain(object):
         else:
             print('CPU mode was going ...')
 
-        if self.args.resume is not None or len(self.args.resume) < 2:
-            checkpoint = torch.load(self.args.result, map_location=lambda storage, loc: storage)
+        if len(self.args.resume) > 2:
+            checkpoint = torch.load(self.args.resume, map_location=lambda storage, loc: storage)
             self.args.start_epoch = checkpoint['epoch']
             self.model['backbone'].load_state_dict(checkpoint['backbone'])
             self.model['auxilnet'].load_state_dict(checkpoint['auxilnet'])
@@ -78,25 +74,26 @@ class PFLDTrain(object):
 
     def _data_loader(self):
 
-        transform = torchvision.transforms.Compose([transforms.ToTensor()])
-        self.data['train_loader'] = DataLoader(WLFWDatasets(self.args.dataroot, transform),
+        transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
+        self.data['train_loader'] = DataLoader(WLFWDatasets(self.args.train_file, transform),
                                         batch_size=self.args.train_batchsize,
                                         shuffle=True,
                                         num_workers=self.args.workers,
                                         drop_last=False)
-        self.data['eval_loader']  = DataLoader(WLFWDatasets(args.val_dataroot, transform),
+        self.data['eval_loader']  = DataLoader(WLFWDatasets(self.args.eval_file, transform),
                                         batch_size=self.args.val_batchsize,
                                         shuffle=False,
                                         num_workers=self.args.workers)
         print('Data loading was finished ...')
 
 
-    def _model_train(self):
+    def _model_train(self, epoch = 0):
 
         self.model['backbone'].train()
         self.model['auxilnet'].train()
 
-        for img, landmark_gt, attribute_gt, euler_angle_gt in self.data['train_loader']:
+        loss_recorder = []
+        for idx, (img, landmark_gt, attribute_gt, euler_angle_gt) in enumerate(self.data['train_loader']):
 
             img.requires_grad            = False
             attribute_gt.requires_grad   = False
@@ -110,15 +107,21 @@ class PFLDTrain(object):
                 euler_angle_gt = euler_angle_gt.cuda(non_blocking=True)
 
             features, landmarks = self.model['backbone'](img)
-            angle = self.model['auxilnet'](features)
+            euler_angle         = self.model['auxilnet'](features)
             weighted_loss, loss = self.model['criterion'](attribute_gt, landmark_gt, euler_angle_gt,
-                                        angle, landmarks, self.args.train_batchsize)
+                                        euler_angle, landmarks, self.args.train_batchsize)
 
             self.model['optimizer'].zero_grad()
             weighted_loss.backward()
             self.model['optimizer'].step()
+            loss_recorder.append([weighted_loss.item(), loss.item()])
 
-        return weighted_loss, loss
+            if (idx + 1) % self.args.print_freq == 0:
+                ave_loss = np.mean(np.array(loss_recorder), axis=0)
+                print('cur_epoch : %3d|%3d, weighted_loss : %.4f, loss : %.4f' % \
+                      (epoch, self.args.end_epoch, ave_loss[0], ave_loss[1]))
+
+        return np.mean(np.array(loss_recorder), axis=0)
 
 
     def _model_eval(self):

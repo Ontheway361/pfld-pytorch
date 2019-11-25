@@ -267,10 +267,10 @@ class WLFWDate(object):
             else:
                 continue
             if (idx + 1) % 100 == 0:
-                print('already processed %4d|%4d ...' % (idx + 1, len(self.anno_info)))
+                print('already processed %4d|%4d ...' % (idx + 1, len(self.anno_file)))
             if self.args.is_debug and (idx + 1) % 20 == 0:
                 break
-        save_file = os.path.join(self.args.data_dir, 'wflw_anno', self.args.save_folder + '.txt')
+        save_file = os.path.join(self.args.data_dir, self.args.save_folder, self.args.save_folder + '.txt')
         with open(save_file, 'w') as f:
             for face_info in faces_info:
                 f.writelines(face_info)

@@ -20,7 +20,7 @@ pip3 install -r requirements.txt
 4. move `Mirror98.txt` to `WFLW/WFLW_annotations`
 
 ~~~shell
-$ cd data 
+$ cd data
 $ python3 SetPreparation.py
 ~~~
 
@@ -47,12 +47,3 @@ $ python3 test.py
  PFLD: A Practical Facial Landmark Detector https://arxiv.org/pdf/1902.10859.pdf
 
 Tensorflow Implementation: https://github.com/guoqiangqi/PFLD
-
-#### TODO:
-
-- [ ] fix bugs
-
-- [ ] ncnn inference
-
-- [ ] retrain on datasets AFLW and 300W
-

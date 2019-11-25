@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-'''
-Created on 2019/11/19
-author: relu
-'''
+
 
 
 import cv2
@@ -14,24 +11,19 @@ import torch
 import torchvision
 import numpy as np
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
-
-from pfld.loss import PFLDLoss
-from pfld.utils import AverageMeter
 from dataset.datasets import WLFWDatasets
-from models.pfld import PFLDInference, AuxiliaryNet
+from models.pfld import PFLDbackbone, AuxiliaryNet, PFLDLoss
 
 
 def validate(wlfw_val_dataloader, plfd_backbone, auxiliarynet):
-    
+
     plfd_backbone.eval()
     auxiliarynet.eval()
 
     with torch.no_grad():
-        losses = []
-        losses_ION = []
+        losses, losses_ION = [], []
+        for idx, (img, landmark_gt, attribute_gt, euler_angle_gt) in enumerate(wlfw_val_dataloader):
 
-        for img, landmark_gt, attribute_gt, euler_angle_gt in wlfw_val_dataloader:
             img.requires_grad = False
             img = img.cuda(non_blocking=True)
 
@@ -49,9 +41,7 @@ def validate(wlfw_val_dataloader, plfd_backbone, auxiliarynet):
 
             _, landmarks = plfd_backbone(img)
 
-            loss = torch.mean(
-                torch.sqrt(torch.sum((landmark_gt - landmarks)**2, axis=1))
-                )
+            loss = torch.mean(torch.sqrt(torch.sum((landmark_gt - landmarks)**2, axis=1)))
 
             landmarks = landmarks.cpu().numpy()
             landmarks = landmarks.reshape(landmarks.shape[0], -1, 2)
@@ -87,24 +77,22 @@ def validate(wlfw_val_dataloader, plfd_backbone, auxiliarynet):
 def main(args):
     checkpoint = torch.load(args.model_path)
 
-    plfd_backbone = PFLDInference().cuda()
+    plfd_backbone = PFLDbackbone().cuda()
     auxiliarynet = AuxiliaryNet().cuda()
 
     plfd_backbone.load_state_dict(checkpoint['plfd_backbone'])
     auxiliarynet.load_state_dict(checkpoint['auxiliarynet'])
 
-    transform = transforms.Compose([transforms.ToTensor()])
-
-    wlfw_val_dataset = WLFWDatasets(args.test_dataset, transform)
-    wlfw_val_dataloader = DataLoader(
-        wlfw_val_dataset, batch_size=8, shuffle=False, num_workers=0)
+    transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
+    wlfw_val_dataloader = DataLoader(WLFWDatasets(args.test_dataset, transform), \
+                                     batch_size=8, shuffle=False, num_workers=0)
 
     validate(wlfw_val_dataloader, plfd_backbone, auxiliarynet)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Testing')
-    parser.add_argument('--model_path', default="./checkpoint/snapshot/checkpoint.pth.tar", type=str)
-    parser.add_argument('--test_dataset', default='./data/test_data/list.txt', type=str)
+    parser.add_argument('--model_path',   type=str, default="./checkpoint/checkpoint.pth.tar" )
+    parser.add_argument('--test_dataset', type=str, default='./data/test_data/list.txt')
 
     args = parser.parse_args()
     return args
