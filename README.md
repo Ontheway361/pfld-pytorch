@@ -5,7 +5,7 @@ Implementation of  PFLD A Practical Facial Landmark Detector by pytorch.
 #### install requirements
 
 ~~~shell
-pip3 install -r requirements.txt
+pip3 install -r utils/requirements.txt
 ~~~
 
 #### Datasets

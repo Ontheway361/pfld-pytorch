@@ -32,10 +32,10 @@ class PFLDTrain(object):
 
         str = '-' * 16
         print('%sEnvironment Versions%s' % (str, str))
-        print("- Python: {}".format(sys.version.strip().split('|')[0]))
-        print("- PyTorch: {}".format(torch.__version__))
+        print("- Python    : {}".format(sys.version.strip().split('|')[0]))
+        print("- PyTorch   : {}".format(torch.__version__))
         print("- TorchVison: {}".format(torchvision.__version__))
-        print("- device: {}".format(self.device))
+        print("- use_gpu   : {}".format(self.device))
         print('-'*52)
 
 
@@ -43,7 +43,7 @@ class PFLDTrain(object):
 
         self.model['backbone']  = PFLDbackbone().cuda(0) if self.device else PFLDbackbone()
         self.model['auxilnet']  = AuxiliaryNet().cuda(0) if self.device else AuxiliaryNet()
-        self.model['criterion'] = PFLDLoss()
+        self.model['criterion'] = PFLDLoss(use_gpu=self.device)
         self.model['optimizer'] = torch.optim.Adam(
                                       [{'params': self.model['backbone'].parameters()},
                                        {'params': self.model['auxilnet'].parameters()}],
@@ -56,7 +56,7 @@ class PFLDTrain(object):
         if self.device and len(self.args.gpu_ids) > 1:
             self.model['backbone'] = torch.nn.DataParallel(self.model['backbone'], device_ids=self.args.gpu_ids)
             self.model['auxilnet'] = torch.nn.DataParallel(self.model['auxilnet'], device_ids=self.args.gpu_ids)
-            self.backends.cudnn.benchmark = True
+            torch.backends.cudnn.benchmark = True
             print('Parallel mode was going ...')
         elif self.device:
             print('Single-gpu mode was going ...')
@@ -148,26 +148,39 @@ class PFLDTrain(object):
 
                 _, landmark = self.model['backbone'](img)
 
-                loss = torch.mean(torch.sum((landmark_gt - landmark)**2,axis=1))
+                loss = torch.mean(torch.sum((landmark_gt - landmark)**2, dim=1))
                 losses.append(loss.cpu().numpy())
-
-        return np.mean(losses)
+        ave_loss = np.mean(losses)
+        print('eval_loss was : %.4f' % ave_loss)
+        return ave_loss
 
 
     def _main_loop(self):
-
+        
+        min_loss = 1e6
         for epoch in range(self.args.start_epoch, self.args.end_epoch + 1):
 
             weighted_train_loss, train_loss = self._model_train()
-            filename = os.path.join(str(self.args.snapshot), "checkpoint_epoch_" + str(epoch) + '.pth.tar')
-            torch.save({
-                'epoch'   : epoch,
-                'backbone': self.model['backbone'].state_dict(),
-                'auxilnet': self.model['auxilnet'].state_dict()
-            }, filename)
-
+            
+            if (epoch + 1) % self.args.save_freq == 0:
+                filename = os.path.join(str(self.args.snapshot), "checkpoint_epoch_" + str(epoch) + '.pth.tar')
+                torch.save({
+                    'epoch'   : epoch,
+                    'backbone': self.model['backbone'].state_dict(),
+                    'auxilnet': self.model['auxilnet'].state_dict()
+                }, filename)
+                
             val_loss = self._model_eval()
-
+            
+            if val_loss < min_loss:
+                min_loss = val_loss
+                filename = os.path.join(str(self.args.snapshot), 'sota.pth.tar')
+                torch.save({
+                    'epoch'   : epoch,
+                    'backbone': self.model['backbone'].state_dict(),
+                    'auxilnet': self.model['auxilnet'].state_dict()
+                }, filename)
+                print('sota performance was updated ...')
             self.model['scheduler'].step()
 
 

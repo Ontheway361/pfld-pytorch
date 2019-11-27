@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-
-
 import cv2
 import time
 import argparse
@@ -75,6 +73,7 @@ def validate(wlfw_val_dataloader, plfd_backbone, auxiliarynet):
 
 
 def main(args):
+    
     checkpoint = torch.load(args.model_path)
 
     plfd_backbone = PFLDbackbone().cuda()
@@ -85,12 +84,19 @@ def main(args):
 
     transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
     wlfw_val_dataloader = DataLoader(WLFWDatasets(args.test_dataset, transform), \
-                                     batch_size=8, shuffle=False, num_workers=0)
+                                     batch_size=args.batch_size, shuffle=False, \
+                                     num_workers=args.workers)
 
     validate(wlfw_val_dataloader, plfd_backbone, auxiliarynet)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Testing')
+    # env
+    parser.add_argument('--use_gpu',   type=bool, default=False)
+    parser.add_argument('--gpu_ids',   type=list, default=[0, 1])
+    parser.add_argument('--workers',   type=int,  default=8)
+    parser.add_argument('--batch_size',type=int,  default=8)
+    
     parser.add_argument('--model_path',   type=str, default="./checkpoint/checkpoint.pth.tar" )
     parser.add_argument('--test_dataset', type=str, default='./data/test_data/list.txt')
 

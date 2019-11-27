@@ -9,6 +9,8 @@ sys.path.append('..')
 from torch.utils import data
 from torch.utils.data import DataLoader
 
+
+
 class WLFWDatasets(data.Dataset):
 
     def __init__(self, file_list, transforms=None):
